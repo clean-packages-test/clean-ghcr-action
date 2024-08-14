@@ -5,6 +5,7 @@ import urllib.parse
 
 import requests
 import argparse
+from datetime import datetime, timedelta
 
 API_ENDPOINT = "https://api.github.com"
 PER_PAGE = 100  # max 100 defaults 30
@@ -127,7 +128,7 @@ def get_manifest(image):
 
 
 def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
-                except_untagged_multiplatform):
+                except_untagged_multiplatform, older):
     if untagged_only:
         all_packages = get_all_package_versions(
             owner=owner,
@@ -161,6 +162,11 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
             package_names=package_names,
             owner_type=owner_type,
         )
+    if older > 0:
+        # comparing dates as strings works for this format
+        # and is faster than parsing strings to dates before comparing.
+        timestamp = (datetime.now() - timedelta(seconds=older)).strftime('%Y-%m-%dT%H:%M:%SZ')
+        packages = [pkg for pkg in packages if pkg['updated_at'] < timestamp]
     status = [del_req(pkg["url"]).ok for pkg in packages]
     len_ok = len([ok for ok in status if ok])
     len_fail = len(status) - len_ok
@@ -227,6 +233,12 @@ def get_args():
         help=
         "Except untagged multiplatform packages from deletion (only for --untagged_only) needs docker installed",
     )
+    parser.add_argument(
+        "--older",
+        type=int,
+        default=0,
+        help="Older than time in seconds",
+    )
     args = parser.parse_args()
     if "/" in args.repository:
         repository_owner, repository = args.repository.split("/")
@@ -251,4 +263,5 @@ if __name__ == "__main__":
         package_names=args.package_names,
         untagged_only=args.untagged_only,
         owner_type=args.owner_type,
-        except_untagged_multiplatform=args.except_untagged_multiplatform)
+        except_untagged_multiplatform=args.except_untagged_multiplatform,
+        older=args.older)

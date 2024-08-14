@@ -4,7 +4,7 @@
 
 Action for delete containers from Github container registry
 
-delete all / untagged ghcr containers in a repository
+delete all / untagged / older than ghcr containers in a repository
 ## Usage
 
 <!-- start usage -->
@@ -43,17 +43,22 @@ delete all / untagged ghcr containers in a repository
     # required: true
     # choices: org, user
     owner_type: ''
+    # older than time in seconds
+    # required: false
+    # default: 0
+    older: 0
 
 ```
 <!-- end usage -->
 
 ## Scenarios
--   [Delete all owner containers without tags](#delete-all-owner-containers-without-tags)
--   [Delete all owner containers](#delete-all-owner-containers)
--   [Delete all containers from repository without tags](#delete-all-containers-from-repository-without-tags)
--   [Delete all containers from repository](#delete-all-containers-from-repository)
--   [Delete all containers from package without tags](#delete-all-containers-from-package-without-tags)
--   [Delete all containers from package](#delete-all-containers-from-package)
+- [Delete all owner containers without tags](#delete-all-owner-containers-without-tags)
+- [Delete all owner containers](#delete-all-owner-containers)
+- [Delete all containers from repository without tags](#delete-all-containers-from-repository-without-tags)
+- [Delete all containers from repository](#delete-all-containers-from-repository)
+- [Delete all containers from package without tags](#delete-all-containers-from-package-without-tags)
+- [Delete all containers from package](#delete-all-containers-from-package)
+- [Delete all containers older than 3 months](#delete-all-containers-older-than-3-months)
 
 ## Delete all owner containers without tags
 ```yaml
@@ -170,4 +175,17 @@ delete all / untagged ghcr containers in a repository
       package_name: the-package-name, other-package-name
       untagged_only: false
       owner_type: org # or user
+```
+
+## Delete all containers older than 3 months
+```yaml
+- name: Delete all containers older than 3 months
+  uses: retech-us/clean-ghcr-action@v4.1
+  with:
+      token: ${{ github.token }}
+      repository_owner: ${{ github.repository_owner }}
+      repository: ${{ github.repository }}
+      untagged_only: false
+      owner_type: org # or user
+      older: 7776000 # 90 days in seconds
 ```
