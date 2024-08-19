@@ -129,32 +129,45 @@ def get_manifest(image):
 
 def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 except_untagged_multiplatform, older):
-    if untagged_only:
+    if untagged_only or older > 0:
         all_packages = get_all_package_versions(
             owner=owner,
             repo_name=repo_name,
             package_names=package_names,
             owner_type=owner_type,
         )
-        tagged_pkgs = {
-            pkg: [
-                pkg_ver for pkg_ver in all_packages[pkg]
-                if pkg_ver["metadata"]["container"]["tags"]
-            ]
-            for pkg in all_packages
-        }
+
         if except_untagged_multiplatform:
+            tagged_pkgs = {
+                pkg: [
+                    pkg_ver for pkg_ver in all_packages[pkg]
+                    if pkg_ver["metadata"]["container"]["tags"]
+                ]
+                for pkg in all_packages
+            }
             deps_pkgs = get_deps_pkgs(owner, tagged_pkgs)
         else:
             deps_pkgs = []
-        all_packages = [
-            pkg_ver for pkg in all_packages for pkg_ver in all_packages[pkg]
-        ]
+
         packages = [
-            pkg for pkg in all_packages
-            if not pkg["metadata"]["container"]["tags"]
-            and pkg["name"] not in deps_pkgs
+            pkg_ver for pkg in all_packages for pkg_ver in all_packages[pkg]
+            if pkg_ver["name"] not in deps_pkgs
         ]
+
+        if untagged_only:
+            packages = [
+                pkg for pkg in packages
+                if not pkg["metadata"]["container"]["tags"]
+            ]
+
+        if older > 0:
+            # comparing dates as strings works for this format
+            # and is faster than parsing strings to dates before comparing.
+            timestamp = (datetime.now() - timedelta(seconds=older)).strftime('%Y-%m-%dT%H:%M:%SZ')
+            packages = [
+                pkg for pkg in packages
+                if pkg['updated_at'] < timestamp
+            ]
     else:
         packages = get_list_packages(
             owner=owner,
@@ -162,11 +175,6 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
             package_names=package_names,
             owner_type=owner_type,
         )
-    if older > 0:
-        # comparing dates as strings works for this format
-        # and is faster than parsing strings to dates before comparing.
-        timestamp = (datetime.now() - timedelta(seconds=older)).strftime('%Y-%m-%dT%H:%M:%SZ')
-        packages = [pkg for pkg in packages if pkg['updated_at'] < timestamp]
     status = [del_req(pkg["url"]).ok for pkg in packages]
     len_ok = len([ok for ok in status if ok])
     len_fail = len(status) - len_ok
