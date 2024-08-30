@@ -26,6 +26,7 @@ def get_base_headers():
 
 
 def del_req(path):
+    print(f'DEL {get_url(path)}')
     res = requests.delete(get_url(path), headers=get_base_headers())
     if res.ok:
         print(f"Deleted {path}")
@@ -43,7 +44,7 @@ def get_req(path, params=None):
     url = get_url(path)
     result = []
     while True:
-        print(f'Requesting {url} with params: {params}')
+        print(f'GET {url} {params}')
         response = requests.get(url, headers=get_base_headers(), params=params)
         if not response.ok:
             raise Exception(response.text)
