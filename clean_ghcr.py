@@ -8,7 +8,7 @@ import argparse
 from datetime import datetime, timedelta
 
 API_ENDPOINT = "https://api.github.com"
-PER_PAGE = 100  # max 100 defaults 30
+PER_PAGE = 30  # max 100 defaults 30
 DOCKER_ENDPOINT = "ghcr.io/"
 
 
@@ -20,8 +20,8 @@ def get_url(path):
 
 def get_base_headers():
     return {
-        "Authorization": "token {}".format(args.token),
-        "Accept": "application/vnd.github.v3+json",
+        "Authorization": "Bearer {}".format(args.token),
+        "Accept": "application/vnd.github+json",
     }
 
 
@@ -43,6 +43,7 @@ def get_req(path, params=None):
     url = get_url(path)
     result = []
     while True:
+        print(url, get_base_headers(), params)
         response = requests.get(url, headers=get_base_headers(), params=params)
         if not response.ok:
             raise Exception(response.text)
