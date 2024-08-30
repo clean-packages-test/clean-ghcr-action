@@ -72,7 +72,9 @@ def get_list_packages(owner, repo_name, owner_type, package_names):
             pkgs.append(response.json())
     else:
         pkgs = get_req(
-            f"/{owner_type}s/{owner}/packages?package_type=container")
+            f"/{owner_type}s/{owner}/packages",
+            params={'package_type': 'container'},
+        )
 
     # this is a strange bug in github api, it returns deleted packages
     # I open a ticket for that
