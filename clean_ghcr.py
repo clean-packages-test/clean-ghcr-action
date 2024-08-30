@@ -43,7 +43,7 @@ def get_req(path, params=None):
     url = get_url(path)
     result = []
     while True:
-        print(url, get_base_headers(), params)
+        print(f'Requesting {url} with params: {params}')
         response = requests.get(url, headers=get_base_headers(), params=params)
         if not response.ok:
             raise Exception(response.text)
@@ -68,7 +68,8 @@ def get_list_packages(owner, repo_name, owner_type, package_names):
             response = requests.get(url, headers=get_base_headers())
             if not response.ok:
                 if response.status_code == 404:
-                    return []
+                    print(f'WARNING: Package {package_name} does not exist.')
+                    continue
                 raise Exception(response.text)
             pkgs.append(response.json())
     else:
