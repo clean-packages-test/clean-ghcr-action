@@ -34,6 +34,9 @@ inputs:
   older:
     description: 'Max package age in seconds. Delete packages older than that.'
     default: 0
+  debug:
+    description: 'Extra debug logs'
+    default: false
 outputs:
   num_deleted:
     description: 'Number of package versions that were deleted during the run.'
@@ -65,5 +68,6 @@ runs:
         args+=( "--except_untagged_multiplatform" "${{ inputs.except_untagged_multiplatform }}" )
         args+=( "--owner_type" "${{ inputs.owner_type }}" )
         args+=( "--older" "${{ inputs.older }}" )
+        args+=( "--debug" "${{ inputs.debug }}" )
         echo "args: ${args[@]}"
         python ${{ github.action_path }}/clean_ghcr.py "${args[@]}"

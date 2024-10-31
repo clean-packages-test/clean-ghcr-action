@@ -10,6 +10,12 @@ from datetime import datetime, timedelta
 API_ENDPOINT = "https://api.github.com"
 PER_PAGE = 30  # max 100 defaults 30
 DOCKER_ENDPOINT = "ghcr.io/"
+DEBUG = False
+
+
+def debug(*args, **kwargs):
+    if DEBUG:
+        print(*args, **kwargs)
 
 
 def get_url(path):
@@ -66,6 +72,7 @@ def get_list_packages(owner, repo_name, owner_type, package_names):
             url = get_url(
                 f"/{owner_type}s/{owner}/packages/container/{clean_package_name}"
             )
+            print(f'GET {url}')
             response = requests.get(url, headers=get_base_headers())
             if not response.ok:
                 if response.status_code == 404:
@@ -134,6 +141,14 @@ def get_manifest(image):
 
 def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 except_untagged_multiplatform, older):
+    debug(f'''Delete args:
+    owner: {owner}
+    repo_name: {repo_name}
+    owner_type: {owner_type}
+    package_names: {package_names}
+    untagged_only: {untagged_only}
+    except_untagged_multiplatform: {except_untagged_multiplatform}
+    older: {older}''')
     if untagged_only or older > 0:
         all_packages = get_all_package_versions(
             owner=owner,
@@ -141,6 +156,10 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
             package_names=package_names,
             owner_type=owner_type,
         )
+        packages = [
+            pkg_ver for pkg in all_packages for pkg_ver in all_packages[pkg]
+        ]
+        debug(f'Total: {len(all_packages)} packages, {len(packages)} versions')
 
         if except_untagged_multiplatform:
             tagged_pkgs = {
@@ -151,19 +170,20 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 for pkg in all_packages
             }
             deps_pkgs = get_deps_pkgs(owner, tagged_pkgs)
-        else:
-            deps_pkgs = []
+            debug(f'{len(deps_pkgs)} dep packages')
 
-        packages = [
-            pkg_ver for pkg in all_packages for pkg_ver in all_packages[pkg]
-            if pkg_ver["name"] not in deps_pkgs
-        ]
+            packages = [
+                pkg for pkg in packages
+                if pkg["name"] not in deps_pkgs
+            ]
+            debug(f'{len(packages)} non-dep versions')
 
         if untagged_only:
             packages = [
                 pkg for pkg in packages
                 if not pkg["metadata"]["container"]["tags"]
             ]
+            debug(f'{len(packages)} untagged versions')
 
         if older > 0:
             # comparing dates as strings works for this format
@@ -173,6 +193,7 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 pkg for pkg in packages
                 if pkg['updated_at'] < timestamp
             ]
+            debug(f'{len(packages)} older versions')
     else:
         packages = get_list_packages(
             owner=owner,
@@ -180,6 +201,8 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
             package_names=package_names,
             owner_type=owner_type,
         )
+        debug(f'Total: {len(packages)} packages')
+
     status = [del_req(pkg["url"]).ok for pkg in packages]
     len_ok = len([ok for ok in status if ok])
     len_fail = len(status) - len_ok
@@ -252,6 +275,12 @@ def get_args():
         default=0,
         help="Older than time in seconds",
     )
+    parser.add_argument(
+        "--debug",
+        type=str2bool,
+        default=False,
+        help="Increase log verbosity for debug purposes"
+    )
     args = parser.parse_args()
     if "/" in args.repository:
         repository_owner, repository = args.repository.split("/")
@@ -270,6 +299,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
+    DEBUG = args.debug
     delete_pkgs(
         owner=args.repository_owner,
         repo_name=args.repository,
@@ -277,4 +307,5 @@ if __name__ == "__main__":
         untagged_only=args.untagged_only,
         owner_type=args.owner_type,
         except_untagged_multiplatform=args.except_untagged_multiplatform,
-        older=args.older)
+        older=args.older,
+    )

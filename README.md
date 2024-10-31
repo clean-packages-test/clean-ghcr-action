@@ -189,3 +189,16 @@ delete all / untagged / older than ghcr containers in a repository
       owner_type: org # or user
       older: 7776000 # 90 days in seconds
 ```
+
+## Add debug logs
+```yaml
+- name: Add debug logs
+  uses: retech-us/clean-ghcr-action@v4.1
+  with:
+      token: ${{ github.token }}
+      repository_owner: ${{ github.repository_owner }}
+      repository: ${{ github.repository }}
+      untagged_only: false
+      owner_type: org # or user
+      debug: true
+```
