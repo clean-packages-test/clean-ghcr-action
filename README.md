@@ -200,5 +200,5 @@ delete all / untagged / older than ghcr containers in a repository
       repository: ${{ github.repository }}
       untagged_only: false
       owner_type: org # or user
-      debug: true
+      log_level: 2
 ```

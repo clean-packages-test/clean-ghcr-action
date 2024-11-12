@@ -10,11 +10,11 @@ from datetime import datetime, timedelta
 API_ENDPOINT = "https://api.github.com"
 PER_PAGE = 30  # max 100 defaults 30
 DOCKER_ENDPOINT = "ghcr.io/"
-DEBUG = False
+LOG_LEVEL = 0
 
 
-def debug(*args, **kwargs):
-    if DEBUG:
+def log(*args, level=0, **kwargs):
+    if level <= LOG_LEVEL:
         print(*args, **kwargs)
 
 
@@ -32,12 +32,14 @@ def get_base_headers():
 
 
 def del_req(path):
-    print(f'DEL {get_url(path)}')
+    log(f'DEL {get_url(path)}', level=0)
     res = requests.delete(get_url(path), headers=get_base_headers())
+    log(res.status_code, level=1)
+    log(res.text, level=2)
     if res.ok:
-        print(f"Deleted {path}")
+        log(f"Deleted {path}", level=0)
     else:
-        print(res.text)
+        log(res.text, level=0)
     return res
 
 
@@ -50,8 +52,10 @@ def get_req(path, params=None):
     url = get_url(path)
     result = []
     while True:
-        print(f'GET {url} {params}')
+        log(f'GET {url} {params}', level=0)
         response = requests.get(url, headers=get_base_headers(), params=params)
+        log(response.status_code, level=1)
+        log(response.text, level=2)
         if not response.ok:
             raise Exception(response.text)
         result.extend(response.json())
@@ -72,11 +76,13 @@ def get_list_packages(owner, repo_name, owner_type, package_names):
             url = get_url(
                 f"/{owner_type}s/{owner}/packages/container/{clean_package_name}"
             )
-            print(f'GET {url}')
+            log(f'GET {url}', level=0)
             response = requests.get(url, headers=get_base_headers())
+            log(response.status_code, level=1)
+            log(response.text, level=2)
             if not response.ok:
                 if response.status_code == 404:
-                    print(f'WARNING: Package {package_name} does not exist.')
+                    log(f'WARNING: Package {package_name} does not exist.', level=0)
                     continue
                 raise Exception(response.text)
             pkgs.append(response.json())
@@ -134,21 +140,21 @@ def get_manifest(image):
     cmd = f"docker manifest inspect {image}"
     res = subprocess.run(cmd, shell=True, capture_output=True)
     if res.returncode != 0:
-        print(cmd)
+        log(cmd, level=0)
         raise Exception(res.stderr)
     return res.stdout.decode("utf-8")
 
 
 def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 except_untagged_multiplatform, older):
-    debug(f'''Delete args:
+    log(f'''Delete args:
     owner: {owner}
     repo_name: {repo_name}
     owner_type: {owner_type}
     package_names: {package_names}
     untagged_only: {untagged_only}
     except_untagged_multiplatform: {except_untagged_multiplatform}
-    older: {older}''')
+    older: {older}''', level=1)
     if untagged_only or older > 0:
         all_packages = get_all_package_versions(
             owner=owner,
@@ -159,7 +165,7 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
         packages = [
             pkg_ver for pkg in all_packages for pkg_ver in all_packages[pkg]
         ]
-        debug(f'Total: {len(all_packages)} packages, {len(packages)} versions')
+        log(f'Total: {len(all_packages)} packages, {len(packages)} versions', level=1)
 
         if except_untagged_multiplatform:
             tagged_pkgs = {
@@ -170,20 +176,20 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 for pkg in all_packages
             }
             deps_pkgs = get_deps_pkgs(owner, tagged_pkgs)
-            debug(f'{len(deps_pkgs)} dep packages')
+            log(f'{len(deps_pkgs)} dep packages', level=1)
 
             packages = [
                 pkg for pkg in packages
                 if pkg["name"] not in deps_pkgs
             ]
-            debug(f'{len(packages)} non-dep versions')
+            log(f'{len(packages)} non-dep versions', level=1)
 
         if untagged_only:
             packages = [
                 pkg for pkg in packages
                 if not pkg["metadata"]["container"]["tags"]
             ]
-            debug(f'{len(packages)} untagged versions')
+            log(f'{len(packages)} untagged versions', level=1)
 
         if older > 0:
             # comparing dates as strings works for this format
@@ -193,7 +199,7 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
                 pkg for pkg in packages
                 if pkg['updated_at'] < timestamp
             ]
-            debug(f'{len(packages)} older versions')
+            log(f'{len(packages)} older versions', level=1)
     else:
         packages = get_list_packages(
             owner=owner,
@@ -201,13 +207,13 @@ def delete_pkgs(owner, repo_name, owner_type, package_names, untagged_only,
             package_names=package_names,
             owner_type=owner_type,
         )
-        debug(f'Total: {len(packages)} packages')
+        log(f'Total: {len(packages)} packages', level=1)
 
     status = [del_req(pkg["url"]).ok for pkg in packages]
     len_ok = len([ok for ok in status if ok])
     len_fail = len(status) - len_ok
 
-    print(f"Deleted {len_ok} package")
+    log(f"Deleted {len_ok} package", level=0)
     if "GITHUB_OUTPUT" in os.environ:
         with open(os.environ["GITHUB_OUTPUT"], "a") as f:
             f.write(f"num_deleted={len_ok}\n")
@@ -276,10 +282,10 @@ def get_args():
         help="Older than time in seconds",
     )
     parser.add_argument(
-        "--debug",
-        type=str2bool,
-        default=False,
-        help="Increase log verbosity for debug purposes"
+        "--log_level",
+        type=int,
+        default=0,
+        help="Log verbosity 0 - 2."
     )
     args = parser.parse_args()
     if "/" in args.repository:
@@ -299,7 +305,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-    DEBUG = args.debug
+    LOG_LEVEL = args.log_level
     delete_pkgs(
         owner=args.repository_owner,
         repo_name=args.repository,
